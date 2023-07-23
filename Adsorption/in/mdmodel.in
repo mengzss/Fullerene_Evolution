@@ -1,0 +1,100 @@
+
+label model_0
+
+units           real  
+dimension       3
+boundary         p p p 
+atom_style      full
+read_data       ../addMole/${baseName}    
+
+variable        dt equal 0.1 
+variable        T  equal ${lv2}
+variable        totaddNum equal ${lv1}
+variable        V equal vol
+variable       Xlo  equal   xlo 
+variable       Xhi  equal   xhi 
+variable       Ylo  equal   ylo 
+variable       Yhi  equal   yhi 
+variable       Zlo  equal   zlo 
+variable       Zhi  equal   zhi 
+
+change_box all x final  ${Xlo}  ${Xhi} y final ${Ylo}  ${Yhi} z final  ${Zlo}  ${Zhi}
+
+group 1 type 1
+group 2 type 2  
+group soot union 1 2
+group 3 subtract all soot
+group mv union 1 3
+
+pair_style reax/c NULL safezone 2.6 mincap 1000    
+pair_coeff * *  ../potential_file/CHO2016.ff C C C H
+fix pa all qeq/reax 1 0.0 10.0 1.0e-5 reax/c
+
+neigh_modify delay 0 every 1 check yes page 500000 one 50000
+timestep     ${dt}
+run 0
+
+label model_1
+
+variable  addid equal ${addid}+1
+variable  admols equal ${addNum}*${addid}
+
+molecule  addmol1 ../addMole/${nid1}.txt
+molecule  addmol2 ../addMole/${nid2}.txt
+molecule  addC60 ../addMole/C60.txt
+
+variable  atsoot atom "type==1 || type==2"
+group st dynamic all var atsoot
+
+variable  atmol_C atom "type==3"
+group m_C dynamic all var atmol_C
+variable  atmol_H atom "type==4"
+group m_H dynamic all var atmol_H
+
+group add  empty
+
+dump        m1  all xyz 2000 ../remodelxyz/${nid1}-${nid2}${Rate}-${T}K-${admols}.xyz
+dump_modify m1  element O O C H
+dump_modify m1  first yes
+
+variable       Xlo  equal   xlo
+variable       Xhi  equal   xhi
+variable       Ylo  equal   ylo
+variable       Yhi  equal   yhi
+variable       Zlo  equal   zlo
+variable       Zhi  equal   zhi
+region  sp block ${Xlo}+${space}  ${Xhi}-${space} ${Ylo}+${space}  ${Yhi}-${space}  ${Zlo}+${space}  ${Zhi}-${space} units box
+
+run 0
+
+variable  nummol_C equal count(m_C)
+variable  nummol_H equal count(m_H)
+
+variable num equal v_nummol_C/${atNumMol_C2}
+print "${num}"
+if "${num} < ${totaddNum} && ${addNum_H}>0" then &
+"fix fadd1  3  deposit ${addNum} 0 1000 8790566  region sp near 1.5 mol addmol1 units box" &
+"fix fadd2  3  deposit ${addNum_H} 0 1000 8790566  region sp near 1.5 mol addmol2 units box" &
+"run 0" &
+elif "${num} < ${totaddNum} && ${addNum_H}==0" &
+"fix fadd1  3  deposit ${addNum} 0 1000 8790566  region sp near 1.5 mol addmol1 units box" &
+"run 0" &
+else &
+"jump ${infilename} mdend"
+
+run 1
+velocity mv create ${T} 102486 mom yes rot yes dist gaussian
+
+fix m1 1 nvt temp ${T} ${T} 10 
+fix m2 3 nvt temp ${T} ${T} 10 
+
+run  100000
+
+write_data  ../remodeldata/${nid1}-${nid2}${Rate}-${T}K-${admols}.data
+
+unfix m1
+unfix m2
+unfix fadd1
+if "${addNum_H}>0" then "unfix fadd2"
+jump ${infilename} mdstart
+
