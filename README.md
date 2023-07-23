@@ -1,4 +1,4 @@
-# Fullerene_Evolution
+# README
 
 These files are Supplementary Data for "Evolution of Fullerenes in Circumstellar Envelopes by Carbon Condensation: Insights from Reactive Molecular Dynamics Simulations".
 
