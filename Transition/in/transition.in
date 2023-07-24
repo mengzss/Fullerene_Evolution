@@ -1,4 +1,3 @@
-
 variable lv1 index  300    
 label loop1
 variable lv2 index  4000   
